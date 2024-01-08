@@ -1,2 +1,2 @@
-# pysisyphus_addons
-Compiled addons for pysisyphus.
+# pysisyphus-addons
+Compiled addons for pysisyphus utilizing Fortran & Cython, built by meson/meson-python.
