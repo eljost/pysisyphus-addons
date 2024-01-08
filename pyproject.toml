@@ -1,0 +1,19 @@
+[build-system]
+build-backend = 'mesonpy'
+requires = [
+  'numpy',
+  'cython',
+  'meson >= 1.0.0',
+  'meson-python >= 0.15.0'
+]
+
+[project]
+name = 'pysisyphus-addons'
+version = '0.0.1'
+description = 'Compiled addons for pysisyphus.'
+readme = 'README.md'
+requires-python = '>=3.9'
+license = {file = 'LICENSE'}
+authors = [
+  {name = "Johannes Steinmetzer", email="johannes.steinmetzer@uni-jena.de"},
+]
