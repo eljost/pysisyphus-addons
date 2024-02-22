@@ -1,0 +1,5 @@
+option('lmax', type: 'integer', min: 0, value: 4, description: 'Maximum angular momentum in the AO basis')
+option('lauxmax', type: 'integer', min: 0, value: 5, description: 'Maximum angular momentum in the auxiliary AO basis')
+option('blas', type: 'combo', choices: ['blas', 'openblas'], value: 'blas')
+option('lapack', type: 'combo', choices: ['lapack', 'openblas'], value: 'lapack')
+

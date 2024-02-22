@@ -1,3 +1,11 @@
+openmp_dep = dependency('openmp')
+blas_dep = dependency(get_option('blas'))
+lapack_dep = dependency(get_option('lapack'))
+# Maximum angular momenta for which integrals will be generated
+lmax = get_option('lmax')
+lauxmax = get_option('lauxmax')
+
+
 py = import('python').find_installation(pure: false)
 py_dep = py.dependency()
 
@@ -21,4 +29,14 @@ if buildtype == 'release'
   add_project_arguments([ '-Ofast', ], language: 'fortran')
 endif
 
-subdir('wavefunction')
+
+subdir('gdma')
+
+libhermes_srcs = []
+subdir('common')
+subdir('integrals')
+libhermes = static_library('libhermes', libhermes_srcs, 
+  dependencies: [openmp_dep, blas_dep, lapack_dep],
+)
+
+subdir('diabatization')
