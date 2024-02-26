@@ -20,7 +20,7 @@ contains
       call int_2c2e_init()
       call int_3c2e_init()
       initialized = .true.
-      print *, "Initialized modules!"
+      print *, "Initialized integral modules."
 
    end subroutine init
 

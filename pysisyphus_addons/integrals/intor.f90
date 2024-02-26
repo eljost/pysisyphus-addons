@@ -40,7 +40,7 @@ contains
       procedure(int2c_sub), pointer, intent(in) :: fncpntr
       real(dp), intent(in), optional :: R(3)
 
-      integer(i4) :: a, b, b_start
+      integer(i4) :: a, b
       integer(i4) :: i, j, k
       real(dp), dimension(shells%nsphbfs, shells%nsphbfs) :: integrals
       real(dp), allocatable :: pres(:)
@@ -49,12 +49,11 @@ contains
       ! Initialize integral array with zeros
       integrals = 0
 !$omp parallel do default(none) shared(shells, fncpntr, R, integrals) &
-!$omp& private(shell_a, b, shell_b, b_start, pres, k, i, j) schedule(dynamic)
+!$omp& private(shell_a, b, shell_b, pres, k, i, j) schedule(dynamic)
       ! Loop over shells
       do a = 1, shells%nshells
          shell_a = shells%shells(a)
-         b_start = a
-         do b = b_start, shells%nshells
+         do b = a, shells%nshells
             shell_b = shells%shells(b)
             ! TODO: Only allocate once for largest L-pair?!
             ! Or allocate a 2d pres with one row per thread
