@@ -1,5 +1,6 @@
 module mod_pa_grid
    use ieee_arithmetic
+
    use mod_pa_constants, only: i4, dp
    use mod_pa_shells, only: t_shell, t_shells
 
@@ -191,7 +192,11 @@ module mod_pa_grid
       allocate(scratch(ndens, blk_size, shells%ncartbfs))
       allocate(nu_contributed(ndens, shells%ncartbfs))
 
-      ! Loop over all blocks
+      ! Loop over independent blocks. Depending on the number of available threads,
+      ! multiple blocks can run in parallel.
+      !$omp parallel do shared(grid_densities) private(cur_blk_start, cur_blk_end, cur_blk_size, &
+      !$omp& R, shell, Ra, RA2, cur_center_ind, mean, chis, chis_mean, scratch, nu_contributed, &
+      !$omp& factor, dens_nm, contrib) schedule (dynamic)
       do cur_blk = 1, nblks
          ! Determine start index, end index and size of a block. The last
          ! block may have a different size, because there may not be enough points left.
@@ -276,6 +281,7 @@ module mod_pa_grid
             ! End loop over densities
          end do
       end do
+      !$omp end parallel do
       ! End loop over all blocks
    end subroutine eval_densities
 

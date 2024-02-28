@@ -7,7 +7,7 @@ grid_mod = py.extension_module(
   '_grid.pyx',
   include_directories: np_inc,
   link_with: [libhermes],
-  dependencies: [py_dep],
+  dependencies: [openmp_dep, py_dep],
   install: true,
   subdir: pkgdir / 'grid'
 )
