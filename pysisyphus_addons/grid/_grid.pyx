@@ -25,7 +25,6 @@ cdef extern:
             const double *grid_densities,
             int blk_size,
             double thresh,
-            bint accumulate,
     )
 
 
@@ -37,7 +36,6 @@ def eval_densities(
     cython.double[:, :, ::1] densities,
     cython.int blk_size = 100,
     cython.double thresh = 1e-8,
-    cython.bint accumulate = False,
 ):
     ndens = densities.shape[0]
     nbfs = densities.shape[1]
@@ -73,6 +71,5 @@ def eval_densities(
         <double *> grid_densities.data,
         blk_size,
         thresh,
-        accumulate,
     )
     return grid_densities

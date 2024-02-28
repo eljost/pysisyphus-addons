@@ -108,7 +108,7 @@ module mod_pa_grid
         ! End loop over primitives
     end subroutine cart_gto3d_rel
 
-   subroutine eval_densities(shells, grid3d, densities, grid_densities, blk_size, thresh, accumulate)
+   subroutine eval_densities(shells, grid3d, densities, grid_densities, blk_size, thresh)
       type(t_shells), intent(in) :: shells
       ! Grid points for density evaluation with shape (3, npoints)
       real(dp), intent(in) :: grid3d(:, :)
@@ -124,13 +124,9 @@ module mod_pa_grid
       ! Threshold used for estimation whether a basis function contributes to a given
       ! grid point. Increase for increased accuracy.
       real(dp), optional, intent(in) :: thresh
-      ! Boolean flag that controls wheter grid_densities is zeroed or not. When set to
-      ! false, its default value, then grid_densities is zerod before density evaluation.
-      logical, optional, intent(in) :: accumulate
       ! Actual values
       integer(i4) :: act_blk_size
       real(dp) :: act_thresh
-      logical :: act_accumulate
 
       ! Number of points and number of blocks
       integer(i4) :: npoints, nblks
@@ -178,16 +174,9 @@ module mod_pa_grid
       else
          act_thresh = 1e-8
       end if
-      if (present(accumulate)) then
-         act_accumulate = accumulate
-      else
-         act_accumulate = .false.
-      end if
 
-      ! Zero density on grid when we don't accumulate
-      if (.not. accumulate) then
-         grid_densities = 0
-      end if
+      ! Zero density on grid
+      grid_densities = 0
 
       ! Determine number of points and number of blocks
       npoints = size(grid3d, 2)

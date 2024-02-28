@@ -9,7 +9,7 @@ module mod_pa_grid_wrapper
   contains
     subroutine f_eval_densities(&
       nshells, ndata, bas_centers, bas_spec, bas_data, &
-      npoints, grid3d, ndens, nbfs, densities, grid_densities, blk_size, thresh, accumulate) &
+      npoints, grid3d, ndens, nbfs, densities, grid_densities, blk_size, thresh) &
       bind(c, name="f_eval_densities")
 
       ! AO basis
@@ -29,16 +29,12 @@ module mod_pa_grid_wrapper
       ! Optional arguments
       integer(c_int32_t), value, intent(in) :: blk_size
       real(c_double), value, intent(in) :: thresh
-      logical(c_bool), value, intent(in) :: accumulate
-      logical :: f_accumulate
       ! Shells
       type(t_shells) :: shells
 
-      ! Convert 1-byte c boolean to 4-byte Fortran boolean
-      f_accumulate = logical(accumulate)
       ! Construct shells and evaluate densities
       shells = t_shells(nshells, bas_centers, bas_spec, bas_data)
-      call eval_densities(shells, grid3d, densities, grid_densities, blk_size, thresh, f_accumulate)
+      call eval_densities(shells, grid3d, densities, grid_densities, blk_size, thresh)
 
     end subroutine f_eval_densities
 end module mod_pa_grid_wrapper
