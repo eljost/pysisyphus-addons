@@ -4,8 +4,6 @@ project(
   'fortran',
   default_options: [
     'warning_level=everything',
-    #'buildtype=debugoptimized',
-    #'optimization=3',
   ],
 )
 

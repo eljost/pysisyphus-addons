@@ -44,3 +44,4 @@ libhermes = library('libhermes', libhermes_srcs,
 )
 
 subdir('diabatization')
+subdir('grid')
