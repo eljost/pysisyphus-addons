@@ -25,8 +25,12 @@ py.install_sources(
 )
 
 buildtype = get_option('buildtype')
-if buildtype == 'release'
-  add_project_arguments([ '-Ofast', ], language: 'fortran')
+if meson.get_compiler('fortran').get_id() == 'gcc'
+  if buildtype == 'release'
+    add_project_arguments([ '-Ofast', ], language: 'fortran')
+  elif buildtype == 'debug'
+    add_project_arguments('-fbounds-check', language: 'fortran')
+  endif
 endif
 
 
@@ -35,7 +39,6 @@ subdir('gdma')
 libhermes_srcs = []
 subdir('common')
 subdir('integrals')
-#libhermes = static_library('libhermes', libhermes_srcs, 
 libhermes = library('libhermes', libhermes_srcs, 
   dependencies: [openmp_dep, blas_dep, lapack_dep],
 )
