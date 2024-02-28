@@ -14,6 +14,7 @@ module mod_prim_dens
 contains
 
    subroutine prefacts(La, RA, res)
+      ! Similar to cart_gto3d_rel in grid.f90
       integer(int32), intent(in) :: La
       real(dp), intent(in) :: RA(3)
       real(dp), intent(out) :: res(:)
@@ -45,12 +46,12 @@ contains
       ! s-Orbital
       if (La == 0) then
          res(1) = 1.0
-         ! p-Orbital
+      ! p-Orbital
       elseif (La == 1) then
          res(1) = dx
          res(2) = dy
          res(3) = dz
-         ! d-Orbital
+      ! d-Orbital
       elseif (La == 2) then
          res(1) = NORM2*dx2
          res(2) = dx*dy
@@ -58,7 +59,7 @@ contains
          res(4) = NORM2*dy2
          res(5) = dy*dz
          res(6) = NORM2*dz2
-         ! f-Orbital
+      ! f-Orbital
       elseif (La == 3) then
          res(1) = NORM3*dx3
          res(2) = NORM2*dx2*dy
@@ -70,7 +71,7 @@ contains
          res(8) = NORM2*dy2*dz
          res(9) = NORM2*dy*dz2
          res(10) = NORM3*dz3
-         ! g-Orbital
+      ! g-Orbital
       elseif (La == 4) then
          res(1) = NORM4*dx4
          res(2) = NORM3*dx3*dy
