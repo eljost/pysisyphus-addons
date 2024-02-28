@@ -18,8 +18,17 @@ module mod_pa_grid
         real(dp), intent(in) :: axs(:), das(:)
         real(dp), intent(in) :: RA(3), RA2(3)
         real(dp), intent(in out) :: result(:)
-        real(dp) :: dx, dy, dz, dx2, dy2, dz2, dist, exparg, expterm
-        real(dp) :: dx3, dy3, dz3, dx4, dy4, dz4
+        ! Differences in x, y and z direction between grid point and shell center
+        real(dp) :: dx, dy, dz
+        ! Differences dx, dy, and dz to the power of 2; evaluated always
+        real(dp) :: dx2, dy2, dz2
+        ! Differences dx, dy, and dz to the power of 3; evaluated only for La > 2
+        real(dp) :: dx3, dy3, dz3
+        ! Differences dx, dy, and dz to the power of 4; evaluated only for La > 3
+        real(dp) :: dx4, dy4, dz4
+        ! Distance dist between grid point and shell center, argument to the exp-function
+        ! exparg and its actual value expterm.
+        real(dp) :: dist, exparg, expterm
         integer(i4) :: i
 
         ! Initialize result array
@@ -99,14 +108,14 @@ module mod_pa_grid
         ! End loop over primitives
     end subroutine cart_gto3d_rel
 
-   subroutine eval_density(shells, grid3d, density, grid_dens, blk_size, thresh, accumulate)
+   subroutine eval_densities(shells, grid3d, densities, grid_densities, blk_size, thresh, accumulate)
       type(t_shells), intent(in) :: shells
       ! Grid points for density evaluation with shape (3, npoints)
       real(dp), intent(in) :: grid3d(:, :)
-      ! Cartesian AO density matrix in pysisyphus-order, shape (ncartbfs, ncartbfs)
-      real(dp), intent(in) :: density(:, :)
+      ! Cartesian AO density matrices in pysisyphus-order, shape (ndens, ncartbfs, ncartbfs)
+      real(dp), intent(in) :: densities(:, :, :)
       ! Arry holding the density on the grid points with shape (npoints, )
-      real(dp), intent(in out) :: grid_dens(:)
+      real(dp), intent(in out) :: grid_densities(:, :)
 
       ! Optional arguments
       !
@@ -115,8 +124,8 @@ module mod_pa_grid
       ! Threshold used for estimation whether a basis function contributes to a given
       ! grid point. Increase for increased accuracy.
       real(dp), optional, intent(in) :: thresh
-      ! Boolean flag that controls wheter grid_dens is zeroed or not. When set to
-      ! false, its default value, then grid_dens is zerod before density evaluation.
+      ! Boolean flag that controls wheter grid_densities is zeroed or not. When set to
+      ! false, its default value, then grid_densities is zerod before density evaluation.
       logical, optional, intent(in) :: accumulate
       ! Actual values
       integer(i4) :: act_blk_size
@@ -125,15 +134,20 @@ module mod_pa_grid
 
       ! Number of points and number of blocks
       integer(i4) :: npoints, nblks
+      ! Number of densities and number of basis functions
+      integer(i4) :: ndens, nbfs
       ! Indices and sizes related to a given block
       integer(i4) :: cur_blk, cur_blk_start, cur_blk_end, cur_blk_size
       ! Various indices:
       !  i: Indexes grid points
+      !  j: Indexes densities
       !  a: Indexes shells
       !  nu, mu: Index basis functions
-      integer(i4) :: i, a, nu, mu
-      ! Array holding Cartesian basis function values for a block
-      real(dp), allocatable :: chis_cart(:, :), chis_mean(:), scratch(:, :)
+      integer(i4) :: i, j, a, nu, mu
+      ! Array holding Cartesian basis function values for a block and their mean values
+      real(dp), allocatable :: chis(:, :), chis_mean(:)
+      ! Scratch array w/ shape (ndens, nblks, nbfs)
+      real(dp), allocatable :: scratch(:, :, :)
       type(t_shell) :: shell
       ! Indexing pointing on the current basis function center A, used to calculate RA.
       integer(i4) :: cur_center_ind
@@ -147,7 +161,7 @@ module mod_pa_grid
       ! Factor that takes symmetry of density matrix into account
       real(dp) :: factor
       ! Logical array indicating which basis function contributed to a given grid point
-      logical, allocatable :: nu_contributed(:)
+      logical, allocatable :: nu_contributed(:, :)
       ! Estimated contribution of a basis function pair at a given grid point
       real(dp) :: contrib
       ! Element of the density matrix
@@ -172,17 +186,21 @@ module mod_pa_grid
 
       ! Zero density on grid when we don't accumulate
       if (.not. accumulate) then
-         grid_dens = 0
+         grid_densities = 0
       end if
-
-      allocate(chis_cart(blk_size, shells%ncartbfs))
-      allocate(chis_mean(shells%ncartbfs))
-      allocate(scratch(blk_size, shells%ncartbfs))
-      allocate(nu_contributed(shells%ncartbfs))
 
       ! Determine number of points and number of blocks
       npoints = size(grid3d, 2)
       nblks = ceiling(real(npoints, dp) / real(blk_size, dp))
+      ! Determine number of densities and Cartesian basis functions
+      ndens = size(densities, 1)
+      nbfs = size(densities, 2)
+
+      allocate(chis(blk_size, shells%ncartbfs))
+      allocate(chis_mean(shells%ncartbfs))
+      ! TODO: investiage memory layout of scratch
+      allocate(scratch(ndens, blk_size, shells%ncartbfs))
+      allocate(nu_contributed(ndens, shells%ncartbfs))
 
       ! Loop over all blocks
       do cur_blk = 1, nblks
@@ -207,7 +225,7 @@ module mod_pa_grid
                end if
                ! Evaluate basis function shell at the grid point R
                call cart_gto3d_rel(shell%L, shells%get_exps(a), shells%get_coeffs(a), RA, RA2, &
-                                   chis_cart(i, shell%cart_index:shell%cart_index_end))
+                                   chis(i, shell%cart_index:shell%cart_index_end))
             end do
             ! End loop over shells
          end do
@@ -219,46 +237,57 @@ module mod_pa_grid
          do nu = 1, shells%ncartbfs
             mean = 0
             do i = 1, cur_blk_size
-               mean = mean + abs(chis_cart(i, nu))
+               mean = mean + abs(chis(i, nu))
             end do
             chis_mean(nu) = mean / cur_blk_size
          end do
 
          scratch = 0
          nu_contributed = .false.
-         ! Loop over all basis function pairs
+         ! Loop over all unique pairs of basis function
          do nu = 1, shells%ncartbfs
+            ! Note that we start at nu, not at 1!
             do mu = nu, shells%ncartbfs
+               ! Take symmetry of density matrix into account. Off-diagonal elements
+               ! contribute twice.
                if (nu == mu) then
                   factor = 1
                else
                   factor = 2
                end if
-               ! Density matrix is symmetric
-               dens_nm = density(mu, nu)
-               ! Estimate contribution of basis function to current block
-               contrib = factor * dens_nm * chis_mean(nu) * chis_mean(mu)
-               if (abs(contrib) >= thresh) then
-                  scratch(:, nu) = scratch(:, nu) + factor * dens_nm * chis_cart(:, mu)
-                  nu_contributed(nu) = .true.
-               end if
+               ! Loop over all densities
+               do j=1, ndens
+                  ! Density matrix is symmetric
+                  dens_nm = densities(j, mu, nu)
+                  ! Estimate contribution of basis function to current block
+                  contrib = factor * dens_nm * chis_mean(nu) * chis_mean(mu)
+                  if (abs(contrib) >= thresh) then
+                     scratch(j, :, nu) = scratch(j, :, nu) + factor * dens_nm * chis(:, mu)
+                     nu_contributed(j, nu) = .true.
+                  end if
+               end do
+               ! End loop over densities
             end do
          end do
          ! End loop over all basis function pairs
 
          do nu = 1, shells%ncartbfs
-            if (.not. nu_contributed(nu)) then
-               cycle
-            end if
-            do i=1, cur_blk_size
-            !grid_dens(cur_blk_start:cur_blk_end) = &
-               !grid_dens(cur_blk_start:cur_blk_end) + scratch(i, nu) * chis_cart(i, nu)
-            grid_dens(cur_blk_start + i - 1) = &
-               grid_dens(cur_blk_start + i - 1) + scratch(i, nu) * chis_cart(i, nu)
+            ! Loop over all densities
+            do j = 1, ndens
+               if (.not. nu_contributed(j, nu)) then
+                  cycle
+               end if
+               ! Loop over all points in block
+               do i=1, cur_blk_size
+                  grid_densities(j, cur_blk_start + i - 1) = &
+                     grid_densities(j, cur_blk_start + i - 1) + scratch(j, i, nu) * chis(i, nu)
+               end do
+               ! End loop over points in block
             end do
+            ! End loop over densities
          end do
       end do
       ! End loop over all blocks
-   end subroutine eval_density
+   end subroutine eval_densities
 
 end module mod_pa_grid

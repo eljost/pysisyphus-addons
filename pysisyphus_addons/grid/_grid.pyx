@@ -8,7 +8,7 @@ cnp.import_array()
 
 
 cdef extern:
-    void f_eval_density(
+    void f_eval_densities(
             # AO basis
             int nshells,
             int ndata,
@@ -19,26 +19,28 @@ cdef extern:
             int npoints,
             const double *grid3d,
             # Densities
+            int ndens,
             int nbfs,
-            const double *density,
-            const double *grid_dens,
+            const double *densities,
+            const double *grid_densities,
             int blk_size,
             double thresh,
             bint accumulate,
     )
 
 
-def eval_density(
+def eval_densities(
     cython.int[:, ::1] bas_centers,
     cython.int[:, ::1] bas_spec,
     cython.double[::1] bas_data,
     cython.double[:, ::1] grid3d,
-    cython.double[:, ::1] density,
+    cython.double[:, :, ::1] densities,
     cython.int blk_size = 100,
     cython.double thresh = 1e-8,
     cython.bint accumulate = False,
 ):
-    nbfs = density.shape[1]
+    ndens = densities.shape[0]
+    nbfs = densities.shape[1]
     npoints = grid3d.shape[0]
 
     cdef:
@@ -51,10 +53,10 @@ def eval_density(
         # Grid; transposed to shape (3, npoints)
         cnp.ndarray f_grid3d = py_np.asfortranarray(grid3d.T)
         # Densities
-        cnp.ndarray f_density = py_np.asfortranarray(density)
-        cnp.ndarray grid_dens = py_np.zeros(npoints, dtype="double")
+        cnp.ndarray f_densities = py_np.asfortranarray(densities)
+        cnp.ndarray grid_densities = py_np.zeros((ndens, npoints), dtype="double", order="F")
 
-    f_eval_density(
+    f_eval_densities(
         # AO basis
         len(bas_centers),
         len(bas_data),
@@ -65,11 +67,12 @@ def eval_density(
         npoints,
         <double *> f_grid3d.data,
         # Densities
+        ndens,
         nbfs,
-        <double *> f_density.data,
-        <double *> grid_dens.data,
+        <double *> f_densities.data,
+        <double *> grid_densities.data,
         blk_size,
         thresh,
         accumulate,
     )
-    return grid_dens
+    return grid_densities
