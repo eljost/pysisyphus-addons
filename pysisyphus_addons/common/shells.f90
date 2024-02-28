@@ -117,9 +117,9 @@ contains
       integer :: center_ind, atomic_num, L
       ! cur_pntr is read from bas_centers & bas_spec and used to access bas_data
       integer :: cur_pntr
-      ! pntr is incremented by the number of primitives after each shell is read
+      ! prim_pntr is incremented by the number of primitives after each shell is read
       ! and points to contraction coefficients and exponents in the shells object.
-      integer :: pntr
+      integer :: prim_pntr, prim_pntr_end
       ! Number of primitives
       integer :: nprims
       integer :: i
@@ -134,7 +134,7 @@ contains
       allocate (shells%coefficients(nprims))
       allocate (shells%exponents(nprims))
 
-      pntr = 1
+      prim_pntr = 1
       cart_index = 1
       sph_index = 1
       ncartbfs = 0
@@ -150,18 +150,21 @@ contains
          cur_pntr = bas_spec(i, 5)
          ! Create new shell ...
          shell = t_shell(center_ind, center, atomic_num, L, nprims, &
-                         pntr, cart_index, sph_index)
+                         prim_pntr, cart_index, sph_index)
          ! ... and store it
          shells%shells(i) = shell
+         prim_pntr_end = prim_pntr + nprims - 1
          ! Read contraction coefficients and orbital exponents
-         shells%coefficients(pntr:pntr+nprims) = bas_data(cur_pntr:cur_pntr+nprims-1)
+         shells%coefficients(prim_pntr:prim_pntr_end) = bas_data(cur_pntr:cur_pntr+nprims-1)
          cur_pntr = cur_pntr + nprims
-         shells%exponents(pntr:pntr+nprims) = bas_data(cur_pntr:cur_pntr+nprims-1)
-         ! Apply coefficient & exponent dependent normalization to coefficients
-         call norm_cgto_coeffs(shells%coefficients(pntr:pntr + nprims - 1), &
-                               shells%exponents(pntr:pntr + nprims - 1), L)
+         shells%exponents(prim_pntr:prim_pntr_end) = bas_data(cur_pntr:cur_pntr+nprims-1)
+         ! Apply coefficient & exponent dependent normalization to coefficients.
+         ! Angular momentum dependent (lmn) dependent normalization factors are taken
+         ! into account in the integral library.
+         call norm_cgto_coeffs(shells%coefficients(prim_pntr:prim_pntr_end), &
+                               shells%exponents(prim_pntr:prim_pntr_end), L)
          ! Increment pointers & indices
-         pntr = pntr + nprims
+         prim_pntr = prim_pntr + nprims
          ncartbfs = ncartbfs + shell%cart_size
          nsphbfs = nsphbfs + shell%sph_size
          cart_index = cart_index + shell%cart_size
@@ -172,7 +175,6 @@ contains
       shells%nshells = nshells
       shells%ncartbfs = ncartbfs
       shells%nsphbfs = nsphbfs
-
    end function t_shells_constructor
 
    ! Helper procedure to print all shells in t_shells
