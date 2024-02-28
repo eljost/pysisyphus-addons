@@ -11,7 +11,7 @@ def test_coulomb_tensor(this_dir):
     densities_fn = this_dir / "bena2_dcat_densities_relaxed.npy"
     D = np.load(densities_fn)
     densities = np.stack((D[0, 0], D[0, 1], D[1, 1]), axis=0)
-    coulomb_tensor = intor.contract_coulomb_densities_ao(shells, shells, densities)
+    coulomb_tensor = intor.contract_coulomb_densities_4d(shells, shells, densities)
     nstates = 2
     assert coulomb_tensor.shape == (nstates, nstates, nstates, nstates)
     coulomb_tensor_ref = np.array(
