@@ -1,4 +1,4 @@
-module mod_pa_shells_wrapper
+module mod_pa_diabatization_intor_wrapper
 
    use iso_c_binding, only: c_int32_t, c_double
 
@@ -35,18 +35,8 @@ contains
       type(t_shells) :: shells
       type(t_shells) :: shells_aux
 
-      print *, "Hi from the wrapper!"
-      print *, "nshells", nshells
-      print *, "ndata", ndata
-      print *, "nshells_aux", nshells_aux
-      print *, "ndata_aux", ndata_aux
-      print *, "ndens", ndens
-      print *, "nbfs", nbfs
-
       shells = t_shells(nshells, bas_centers, bas_spec, bas_data)
       shells_aux = t_shells(nshells_aux, bas_centers_aux, bas_spec_aux, bas_data_aux)
-
-      print *, "Construted shells in 2d"
 
       call contract_coulomb_densities_2d(shells, shells_aux, densities, df_tensor)
 
@@ -81,9 +71,7 @@ contains
       shells = t_shells(nshells, bas_centers, bas_spec, bas_data)
       shells_aux = t_shells(nshells_aux, bas_centers_aux, bas_spec_aux, bas_data_aux)
 
-      print *, "Constructed shells"
-
       call contract_coulomb_densities_4d(shells, shells_aux, densities, coulomb_tensor)
 
    end subroutine f_contract_coulomb_densities_4d
-end module mod_pa_shells_wrapper
+end module mod_pa_diabatization_intor_wrapper

@@ -54,8 +54,6 @@ contains
       ! Timing related
       real(dp) :: start_time, end_time, dur_time
 
-      print *, "Hi from 2d!"
-
       ! Determine number of auxiliary basis functions, number of present densities and calculate
       ! number states from the number densities.
       naux = shells_aux%nsphbfs

@@ -4,3 +4,5 @@ libhermes_srcs += files(
   'normalization.f90',
   'shells.f90',
 )
+
+subdir('integrals')
