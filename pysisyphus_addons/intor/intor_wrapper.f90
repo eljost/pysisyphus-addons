@@ -20,8 +20,6 @@ contains
       type(t_shells) :: shells
 
       shells = t_shells(nshells, bas_centers, bas_spec, bas_data)
-      call shells%print_shells()
-
       integrals = intor_schwarz(shells)
 
    end subroutine f_int_schwarz

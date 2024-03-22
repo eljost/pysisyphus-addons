@@ -125,8 +125,8 @@ contains
 
             ! Set values/integrals from 1d array pres in 2d integrals array
             k = 1
-            do j=shell_b%sph_index, shell_b%sph_index_end
-               do i=shell_a%sph_index, shell_a%sph_index_end
+            do i=shell_a%sph_index, shell_a%sph_index_end
+               do j=shell_b%sph_index, shell_b%sph_index_end
                   schwarz_integrals(i, j) = pres(k)
                   k = k + 1
                end do

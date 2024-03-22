@@ -34,7 +34,6 @@ def int_schwarz(
     cython.double[::1] bas_data,
 ):
     nbfs = nbfs_from_bas_spec(bas_spec)
-    print("There are", nbfs, "basis functions")
 
     cdef:
         # AO basis
