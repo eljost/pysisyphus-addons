@@ -1,8 +1,8 @@
 module mod_pa_shells
 
-   use iso_fortran_env, only: error_unit, int32
+   use iso_fortran_env, only: error_unit
 
-   use mod_pa_constants, only: dp
+   use mod_pa_constants, only: dp, i4
    use mod_pa_normalization, only: norm_cgto_coeffs
 
    implicit none
@@ -42,18 +42,21 @@ module mod_pa_shells
       type(t_shell), allocatable :: shells(:)
       real(dp), allocatable :: exponents(:)
       real(dp), allocatable :: coefficients(:)
+      real(dp), allocatable :: min_exponents(:)
       ! Number of t_shell objects.
       integer :: nshells
       ! Number of Cartesian basis functions.
       integer :: ncartbfs
       ! Number of spherical basis functions.
       integer :: nsphbfs
+      ! Maximum angular momentum of all shells
+      integer :: L_max
 
       contains
-      procedure :: print_shell
-      procedure :: print_shells
-      procedure :: get_coeffs
-      procedure :: get_exps
+         procedure :: print_shell
+         procedure :: print_shells
+         procedure :: get_coeffs
+         procedure :: get_exps
    end type t_shells
 
    interface t_shells
@@ -90,19 +93,20 @@ contains
       res%sph_index_end = sph_index + res%sph_size - 1
    end function t_shell_constructor
 
+   ! Custom t_shells constructor.
    function t_shells_constructor(nshells, bas_centers, bas_spec, bas_data) result(shells)
       ! Number of shells
-      integer(int32), intent(in) :: nshells
+      integer(i4), intent(in) :: nshells
       ! bas_centers
       ! One entry per shell, integer array.
       !   center_ind, atomic number, pointer to center coordinates in bas_data (3 integers)
-      integer(int32), intent(in) ::  bas_centers(nshells, 3)
+      integer(i4), intent(in) ::  bas_centers(nshells, 3)
       ! bas_spec
       ! One entry per shell, integer array.
       !   shell_ind, total angmom, N_pgto, N_cgto, \
       !   pointer to contraction coefficients and exponents in bas_data \
       !   (2*N_pgto floats)
-      integer(int32), intent(in) ::  bas_spec(nshells, 5)
+      integer(i4), intent(in) ::  bas_spec(nshells, 5)
       real(dp), intent(in) :: bas_data(:)
 
       type(t_shell) :: shell
@@ -114,7 +118,7 @@ contains
       ! Cartesian center of a shell
       real(kind=dp) :: center(3)
       ! Center index, atomic number and total angular momentum of a shell
-      integer :: center_ind, atomic_num, L
+      integer :: center_ind, atomic_num, L, L_max
       ! cur_pntr is read from bas_centers & bas_spec and used to access bas_data
       integer :: cur_pntr
       ! prim_pntr is incremented by the number of primitives after each shell is read
@@ -133,12 +137,14 @@ contains
       allocate (shells%shells(nshells))
       allocate (shells%coefficients(nprims))
       allocate (shells%exponents(nprims))
+      allocate (shells%min_exponents(nshells))
 
       prim_pntr = 1
       cart_index = 1
       sph_index = 1
       ncartbfs = 0
       nsphbfs = 0
+      L_max = -1
       do i = 1, nshells
          center_ind = bas_centers(i, 1)
          atomic_num = bas_centers(i, 2)
@@ -146,6 +152,7 @@ contains
          center = bas_data(cur_pntr:cur_pntr+2)
 
          L = bas_spec(i, 2)
+         L_max = max(L_max, L)
          nprims = bas_spec(i, 3)
          cur_pntr = bas_spec(i, 5)
          ! Create new shell ...
@@ -158,6 +165,7 @@ contains
          shells%coefficients(prim_pntr:prim_pntr_end) = bas_data(cur_pntr:cur_pntr+nprims-1)
          cur_pntr = cur_pntr + nprims
          shells%exponents(prim_pntr:prim_pntr_end) = bas_data(cur_pntr:cur_pntr+nprims-1)
+         shells%min_exponents(i) = minval(shells%exponents(prim_pntr:prim_pntr_end))
          ! Apply coefficient & exponent dependent normalization to coefficients.
          ! Angular momentum dependent (lmn) dependent normalization factors are taken
          ! into account in the integral library.
@@ -175,6 +183,7 @@ contains
       shells%nshells = nshells
       shells%ncartbfs = ncartbfs
       shells%nsphbfs = nsphbfs
+      shells%L_max = L_max
    end function t_shells_constructor
 
    ! Helper procedure to print all shells in t_shells
@@ -195,10 +204,11 @@ contains
 
       shell = self%shells(i)
       print *, "Shell", i
-      print '(A,A,I2,A,I5,A,F12.6,F12.6,F12.6)', char(9), "L=", shell%L, &
-          ", nprims=", shell%nprims, ", at", shell%center
-      print "(A,*(F12.6,:',',1x))", "coeffs", self%coefficients(shell%pntr:shell%pntr_end)
-      print "(A,*(F14.6,:',',1x))", "exps", self%exponents(shell%pntr:shell%pntr_end)
+      print '(A,A,I2,A,I5,A,F12.6,F12.6,F12.6,A)', char(9), "L=", shell%L, &
+          ", nprims=", shell%nprims, ", at", shell%center, " au"
+      print "(A,*(F12.6,:',',1x))", "Coefficients:", self%coefficients(shell%pntr:shell%pntr_end)
+      print "(A,*(F14.6,:',',1x))", "Exponents:", self%exponents(shell%pntr:shell%pntr_end)
+      print '("Minimum exponent:", F12.6)', self%min_exponents(i)
    end subroutine print_shell
 
    function get_coeffs(self, i) result(coeffs)
@@ -216,5 +226,13 @@ contains
 
       exps = self%exponents(self%shells(i)%pntr:self%shells(i)%pntr_end)
    end function get_exps
+
+   function get_min_exp(self, i) result(min_exp)
+      class(t_shells), intent(in) :: self
+      integer, intent(in) :: i
+      real(dp) :: min_exp
+
+      min_exp = self%min_exponents(i)
+   end function get_min_exp
 
 end module mod_pa_shells
