@@ -11,3 +11,4 @@ pkgdir = 'pysisyphus_addons'
 
 subdir('pysisyphus_addons')
 #subdir('tests')
+subdir('tests_fortran')
