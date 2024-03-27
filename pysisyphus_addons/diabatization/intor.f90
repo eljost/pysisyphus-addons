@@ -83,13 +83,14 @@ contains
       dur_time = end_time - start_time
       print '("Calculation of (P|Q)**-0.5 took", f8.4, " s.")', end_time - start_time
 
-      ! Initialize tensor
+      ! Initialize matrices
       gamma_P = 0
+      df_tensor = 0
 
       call cpu_time(start_time)
       ! Contract densities with 3-center-2-electron integrals to form gamma_P
       !
-      ! Loop over all shells in the AO basis
+      ! Loop over all shells in the principal AO basis
       do a = 1, shells%nshells
          shell_a = shells%shells(a)
          do b = a, shells%nshells
@@ -119,7 +120,8 @@ contains
                         do k = shell_aux_c%sph_index, shell_aux_c%sph_index_end
                            gamma_P(k, dens_ind) = gamma_P(k, dens_ind) + integrals(int_ind) &
                                                    *densities(dens_ind, i, j)
-                           ! Take symmetry of the density matrix into account
+                           ! Take symmetry of the density matrix into account; off-diagonal
+                           ! elements are counted twice.
                            if (a .ne. b) then
                               gamma_P(k, dens_ind) = gamma_P(k, dens_ind) + integrals(int_ind) &
                                                       *densities(dens_ind, j, i)
@@ -143,7 +145,7 @@ contains
 
       ! Contract gamma_P with inverse square root (P|Q)^-1/2 of the metric (P|Q)
       ! The result is stored in 'df_tensor'.
-      ! This contraction corresponds to eq.(33) in [2]
+      ! This contraction corresponds to eq. (33) in [2]
       call dgemm("N", "N", naux, ndens, naux, 1d0, metric, naux, gamma_P, naux, &
                  0d0, df_tensor, naux)
 
