@@ -16,7 +16,6 @@ contains
 
     allocate(eigvals(n))
     allocate(eigvecs(n, n))
-    !allocate(work(lwork))
     allocate(work(1))
     allocate(iwork(1))
 
@@ -24,7 +23,7 @@ contains
     lwork = -1
     liwork = -1
     call dsyevd("V", "U", n, eigvecs, n, eigvals, work, lwork, iwork, liwork, info)
-    lwork = work(1)
+    lwork = int(work(1), i4)
     liwork = iwork(1)
     deallocate(work, iwork)
     allocate(work(lwork), iwork(liwork))

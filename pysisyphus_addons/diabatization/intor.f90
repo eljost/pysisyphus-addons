@@ -59,8 +59,8 @@ contains
       naux = shells_aux%nsphbfs
       ndens = size(densities, dim=1)
 
-      print '("Main basis:", i6, " shells, ", i6 " basis functions")', shells%nshells, shells%nsphbfs
-      print '("Aux. basis:", i6, " shells, ", i6 " basis functions")', &
+      print '("Main basis:", i6, " shells, ", i6, " basis functions")', shells%nshells, shells%nsphbfs
+      print '("Aux. basis:", i6, " shells, ", i6, " basis functions")', &
          shells_aux%nshells, shells_aux%nsphbfs
       print '(" Densities:", i6)', ndens
 
