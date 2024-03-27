@@ -7,6 +7,10 @@ module mod_pa_erfinv
 
   implicit none
 
+  private
+
+  public :: erfinv
+
   ! Table 17, P00 to P06 for |x| <= 0.75
   real(dp), parameter :: P_0_075(7) = (/ &
        0.160304955844066229311d2, &
