@@ -18,7 +18,6 @@ module mod_pa_intor
          real(dp), intent(in) :: db(:)
          real(dp), intent(in) :: A(3), B(3)
          real(dp), intent(in) :: R(3)
-         !real(dp), intent(out), dimension(:) :: res
          real(dp), intent(out) :: res(:)
       end subroutine int2c_sub
    end interface
@@ -95,48 +94,69 @@ contains
       integrals = intor2d_sph_symmetric(shells, fncpntr)
    end function int2c2e_sph
 
-   function intor_schwarz(shells) result(schwarz_integrals)
+   function intor_schwarz_aux(shells) result(schwarz_aux)
       type(t_shells), intent(in) :: shells
 
-      integer(i4) :: a, b
-      integer(i4) :: i, j, k
-      real(dp), dimension(shells%nsphbfs, shells%nsphbfs) :: schwarz_integrals
+      integer(i4) :: c
+      real(dp), allocatable :: schwarz_aux(:)
       real(dp), allocatable :: pres(:)
-      type(t_shell) :: shell_a, shell_b
+      type(t_shell) :: shell
+      integer(i4) :: max_size, size_c
+      real(dp), parameter :: R(3) = 0
 
       call init()
 
-      ! Initialize integral array with zeros
-      schwarz_integrals = 0
-!$omp parallel do default(none) shared(shells, schwarz_integrals) &
-!$omp& private(shell_a, b, shell_b, pres, k, i, j) schedule(dynamic)
+      allocate(schwarz_aux(shells%nshells))
+      max_size = (2 * shells%L_max + 1)**2
+      ! Allocate once with maximum size
+      allocate (pres(max_size))
+
+      schwarz_aux = 0
+!$omp parallel do default(none) shared(shells, schwarz_aux) &
+!$omp& private(shell, c, pres, size_c) schedule(dynamic)
+      ! Loop over shells
+      do c = 1, shells%nshells
+         shell = shells%shells(c)
+         size_c = (2 * shell%L + 1)**2
+         call int_2c2e(shell%L, shell%L, &
+                      shells%get_exps(c), shells%get_coeffs(c), shell%center, &
+                      shells%get_exps(c), shells%get_coeffs(c), shell%center, &
+                      R, pres(1:size_c))
+         schwarz_aux(c) = sqrt(norm2(pres(1:size_c)))
+      end do
+!$omp end parallel do
+
+   end function intor_schwarz_aux
+
+   function intor_schwarz_bra(shells) result(schwarz_bra)
+      type(t_shells), intent(in) :: shells
+
+      integer(i4) :: a, b
+      real(dp), allocatable :: schwarz_bra(:)
+      type(t_shell) :: shell_a, shell_b
+      integer(i4) :: nbra
+
+      call init()
+
+      nbra = shells%nshells * (shells%nshells + 1) / 2
+      allocate(schwarz_bra(nbra))
+
+      schwarz_bra = 0
+!$omp parallel do default(none) shared(shells, schwarz_bra) &
+!$omp& private(a, shell_a, b, shell_b) schedule(dynamic)
       ! Loop over shells
       do a = 1, shells%nshells
          shell_a = shells%shells(a)
-         do b = a, shells%nshells
+         do b = 1, a
             shell_b = shells%shells(b)
-            allocate (pres(shell_a%sph_size * shell_b%sph_size))
-
             ! Calculate integral for shell pair
-            call int_schwarz(shell_a%L, shell_b%L, &
+            schwarz_bra(a * (a - 1) / 2 + b) = sqrt(int_schwarz(shell_a%L, shell_b%L, &
                          shells%get_exps(a), shells%get_coeffs(a), shell_a%center, &
-                         shells%get_exps(b), shells%get_coeffs(b), shell_b%center, &
-                         pres)
-
-            ! Set values/integrals from 1d array pres in 2d integrals array
-            k = 1
-            do i=shell_a%sph_index, shell_a%sph_index_end
-               do j=shell_b%sph_index, shell_b%sph_index_end
-                  schwarz_integrals(i, j) = pres(k)
-                  k = k + 1
-               end do
-            end do
-            deallocate (pres)
+                         shells%get_exps(b), shells%get_coeffs(b), shell_b%center))
          end do
       end do
 !$omp end parallel do
 
-      call symmetrize_triu(shells%nsphbfs, schwarz_integrals)
-   end function intor_schwarz
+   end function intor_schwarz_bra
 
 end module mod_pa_intor
