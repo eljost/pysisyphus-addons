@@ -48,6 +48,7 @@ contains
       real(dp) :: metric(shells_aux%nsphbfs, shells_aux%nsphbfs)
       ! 1d-array holding the 3-center-2-electron integrals
       real(dp), allocatable :: integrals(:)
+      integer(i4) :: size_abc
       ! 2d-array holding the contraction of the densities with the 3-center-2-electron integrals.
       ! shape(naux, ndens)
       ! gamma_P corresponds to R^JK_X (eq. 32) in [2].
@@ -74,6 +75,7 @@ contains
       print '(" Densities:", i6)', ndens
 
       allocate (gamma_P(naux, ndens))
+      allocate (integrals((2 * shells%L_max + 1)**2 * (2*shells_aux%L_max + 1)))
 
       ! Initialize integral pointers, if not already done
       call init()
@@ -106,17 +108,15 @@ contains
       call cpu_time(start_time)
       ! Contract densities with 3-center-2-electron integrals to form gamma_P
       !
-      ! Loop over all shells in the principal AO basis
-      do a = 1, shells%nshells
-         shell_a = shells%shells(a)
-         do b = 1, a
-            shell_b = shells%shells(b)
-            ! TODO: the loop over the auxiliary shells should probably be the outermost loop,
-            ! as this would allow for simple parallelization.
-            !
-            ! Loop over all shells in the auxiliary basis
-            do c = 1, shells_aux%nshells
-               shell_aux_c = shells_aux%shells(c)
+      ! Loop over all shells in the auxiliary basis
+      do c = 1, shells_aux%nshells
+         shell_aux_c = shells_aux%shells(c)
+         ! Loop over all shells in the principal AO basis
+         do a = 1, shells%nshells
+            shell_a = shells%shells(a)
+            do b = 1, a
+               shell_b = shells%shells(b)
+               size_abc = shell_a%sph_size * shell_b%sph_size * shell_aux_c%sph_size
 
                ! Skip current shell triple when the integrals are estimated as negligible.
                !int_estimate = screener%qvl_estimate(a, b, c)
@@ -127,16 +127,12 @@ contains
                   cycle
                endif
 
-               ! TODO: allocate once for the biggest possible size and w/ additional dimensions for
-               ! different threads?!
-               allocate (integrals(shell_a%sph_size*shell_b%sph_size*shell_aux_c%sph_size))
-
                ! Calculate integrals over current shell triple and store them in the array 'integrals'
                call int_3c2e(shell_a%L, shell_b%L, shell_aux_c%L, &
                              shells%get_exps(a), shells%get_coeffs(a), shell_a%center, &
                              shells%get_exps(b), shells%get_coeffs(b), shell_b%center, &
                              shells_aux%get_exps(c), shells_aux%get_coeffs(c), shell_aux_c%center, &
-                             integrals)
+                             integrals(1:size_abc))
 
                ! Contract densities with integrals in a direct fashion
                !
@@ -164,11 +160,13 @@ contains
                   ! End loops over basis functions
                end do
                ! End loops over densities
-               deallocate (integrals)
             end do
          end do
       end do
       ! End of density contraction
+
+      deallocate (integrals)
+
       call cpu_time(end_time)
       dur_time = end_time - start_time
       print '("Density contraction took", f8.4, " s.")', end_time - start_time
