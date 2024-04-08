@@ -12,6 +12,7 @@ module mod_pa_diabatization
    use mod_pa_linalg, only: matrix_powerh
    use mod_pa_shells, only: t_shell, t_shells
    use mod_pa_init, only: init
+   use mod_pa_screening, only: t_df_screener
    use mod_pa_intor, only: int2c2e_sph
    use mod_pa_int_3c2e, only: int_3c2e
 
@@ -53,6 +54,14 @@ contains
       real(dp), allocatable :: gamma_P(:, :)
       ! Timing related
       real(dp) :: start_time, end_time, dur_time
+      ! Screener
+      type(t_df_screener) :: screener
+      ! Norm-estimate for integral batch
+      real(dp) ::  int_estimate
+      integer(i4) :: ntriplets, ntriplets_skipped
+
+      ntriplets = shells%nshells * (shells%nshells + 1) / 2 * shells_aux%nshells
+      ntriplets_skipped = 0
 
       ! Determine number of auxiliary basis functions, number of present densities and calculate
       ! number states from the number densities.
@@ -68,6 +77,13 @@ contains
 
       ! Initialize integral pointers, if not already done
       call init()
+
+      screener = t_df_screener(shells, shells_aux, 1d-4)
+      call cpu_time(start_time)
+      call screener%init()
+      call cpu_time(end_time)
+      dur_time = end_time - start_time
+      print '("Initializing the DF-integral screener took ", f6.2, " s")', dur_time
 
       call cpu_time(start_time)
       ! Calculate density fitting metric (P|Q) using the auxilary basis and ...
@@ -93,11 +109,24 @@ contains
       ! Loop over all shells in the principal AO basis
       do a = 1, shells%nshells
          shell_a = shells%shells(a)
-         do b = a, shells%nshells
+         do b = 1, a
             shell_b = shells%shells(b)
+            ! TODO: the loop over the auxiliary shells should probably be the outermost loop,
+            ! as this would allow for simple parallelization.
+            !
             ! Loop over all shells in the auxiliary basis
             do c = 1, shells_aux%nshells
                shell_aux_c = shells_aux%shells(c)
+
+               ! Skip current shell triple when the integrals are estimated as negligible.
+               !int_estimate = screener%qvl_estimate(a, b, c)
+               int_estimate = screener%schwarz_estimate(a, b, c)
+
+               if (int_estimate < 1e-10) then
+                  ntriplets_skipped = ntriplets_skipped + 1
+                  cycle
+               endif
+
                ! TODO: allocate once for the biggest possible size and w/ additional dimensions for
                ! different threads?!
                allocate (integrals(shell_a%sph_size*shell_b%sph_size*shell_aux_c%sph_size))
@@ -106,7 +135,8 @@ contains
                call int_3c2e(shell_a%L, shell_b%L, shell_aux_c%L, &
                              shells%get_exps(a), shells%get_coeffs(a), shell_a%center, &
                              shells%get_exps(b), shells%get_coeffs(b), shell_b%center, &
-                             shells_aux%get_exps(c), shells_aux%get_coeffs(c), shell_aux_c%center, integrals)
+                             shells_aux%get_exps(c), shells_aux%get_coeffs(c), shell_aux_c%center, &
+                             integrals)
 
                ! Contract densities with integrals in a direct fashion
                !
@@ -142,6 +172,8 @@ contains
       call cpu_time(end_time)
       dur_time = end_time - start_time
       print '("Density contraction took", f8.4, " s.")', end_time - start_time
+      print '("Screened out ", i12, " of ", i12, " integral triplets (", f8.2, "%)")', &
+         ntriplets_skipped, ntriplets, 100 * real(ntriplets_skipped, dp) / real(ntriplets, dp)
 
       ! Contract gamma_P with inverse square root (P|Q)^-1/2 of the metric (P|Q)
       ! The result is stored in 'df_tensor'.
