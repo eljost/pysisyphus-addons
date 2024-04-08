@@ -8,7 +8,9 @@
 !        Subotnik, Vura-Weis, Sodt, Ratner, 2010
 
 module mod_pa_diabatization
-   use mod_pa_constants, only: i4, dp
+   use omp_lib
+
+   use mod_pa_constants, only: i4, i8, dp
    use mod_pa_linalg, only: matrix_powerh
    use mod_pa_shells, only: t_shell, t_shells
    use mod_pa_init, only: init
@@ -59,7 +61,9 @@ contains
       type(t_df_screener) :: screener
       ! Norm-estimate for integral batch
       real(dp) ::  int_estimate
-      integer(i4) :: ntriplets, ntriplets_skipped
+      integer(i8) :: ntriplets, ntriplets_skipped
+      integer(i4) :: thread_id
+      integer(i8), allocatable :: skipped_by_thread(:)
 
       ntriplets = shells%nshells * (shells%nshells + 1) / 2 * shells_aux%nshells
       ntriplets_skipped = 0
@@ -105,11 +109,28 @@ contains
       gamma_P = 0
       df_tensor = 0
 
-      call cpu_time(start_time)
+      start_time = omp_get_wtime()
+
+      !$omp parallel
+      ! Allocate array for tracking number of skipped shell-triplets
+      !$omp critical
+      if (.not. allocated(skipped_by_thread)) then
+         allocate(skipped_by_thread(omp_get_num_threads()))
+         skipped_by_thread = 0
+      end if
+      !$omp end critical
+
       ! Contract densities with 3-center-2-electron integrals to form gamma_P
       !
-      ! Loop over all shells in the auxiliary basis
+      ! Loop over all shells in the auxiliary basis.
+      ! The loop is parallelized over the auxiliary shells, so every thread accumulates
+      ! the densities over unique auxiliary basis functions.
+      !$omp do &
+      !$omp& private(thread_id, shell_aux_c, shell_a, shell_b, size_abc, &
+      !$omp& int_estimate, integrals, int_ind) &
+      !$omp& schedule (dynamic)
       do c = 1, shells_aux%nshells
+         thread_id = omp_get_thread_num() + 1
          shell_aux_c = shells_aux%shells(c)
          ! Loop over all shells in the principal AO basis
          do a = 1, shells%nshells
@@ -123,7 +144,7 @@ contains
                int_estimate = screener%schwarz_estimate(a, b, c)
 
                if (int_estimate < 1e-10) then
-                  ntriplets_skipped = ntriplets_skipped + 1
+                  skipped_by_thread(thread_id) = skipped_by_thread(thread_id) + 1
                   cycle
                endif
 
@@ -164,10 +185,15 @@ contains
          end do
       end do
       ! End of density contraction
+      !$omp end do
+      !$omp end parallel
+      end_time = omp_get_wtime()
 
       deallocate (integrals)
 
-      call cpu_time(end_time)
+      ntriplets_skipped = sum(skipped_by_thread)
+      deallocate(skipped_by_thread)
+
       dur_time = end_time - start_time
       print '("Density contraction took", f8.4, " s.")', end_time - start_time
       print '("Screened out ", i12, " of ", i12, " integral triplets (", f8.2, "%)")', &
@@ -216,7 +242,8 @@ contains
       call contract_coulomb_densities_2d(shells, shells_aux, densities, df_tensor)
 
       ! Loop over work array and construct 4d Coulomb-tensor from it.
-      ! Take 8-fold symmetry into account.
+      ! Takes 8-fold symmetry into account.
+      !
       ! Corresponds to eq. (34) in [2].
       dens_ind1 = 1
       do i = 1, nstates
