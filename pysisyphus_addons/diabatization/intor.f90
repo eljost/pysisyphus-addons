@@ -11,6 +11,7 @@ module mod_pa_diabatization
    use omp_lib
 
    use mod_pa_constants, only: i4, i8, dp
+   use mod_pa_timing, only: wtimer
    use mod_pa_linalg, only: matrix_powerh
    use mod_pa_shells, only: t_shell, t_shells
    use mod_pa_init, only: init
@@ -55,8 +56,8 @@ contains
       ! shape(naux, ndens)
       ! gamma_P corresponds to R^JK_X (eq. 32) in [2].
       real(dp), allocatable :: gamma_P(:, :)
-      ! Timing related
-      real(dp) :: start_time, end_time, dur_time
+      ! Variable used for timing function executions
+      real(dp) :: wtime
       ! Screener
       type(t_df_screener) :: screener
       ! Norm-estimate for integral batch
@@ -85,31 +86,29 @@ contains
       call init()
 
       screener = t_df_screener(shells, shells_aux, 1d-4)
-      call cpu_time(start_time)
+      call wtimer(wtime, .true.)
       call screener%init()
-      call cpu_time(end_time)
-      dur_time = end_time - start_time
-      print '("Initializing the DF-integral screener took ", f6.2, " s")', dur_time
+      call wtimer(wtime)
+      print '("Initializing the DF-integral screener took ", f6.2, " s")', wtime
 
-      call cpu_time(start_time)
+      call wtimer(wtime, .true.)
       ! Calculate density fitting metric (P|Q) using the auxilary basis and ...
       metric = int2c2e_sph(shells_aux)
-      call cpu_time(end_time)
-      dur_time = end_time - start_time
-      print '("Calculation of density fitting metric (P|Q) took", f8.4, " s.")', end_time - start_time
+      call wtimer(wtime)
+      print '("Calculation of density fitting metric (P|Q) took", f8.4, " s.")', wtime
 
       ! ... raise it to the power -0.5 to calculate (P|Q)^-0.5
-      call cpu_time(start_time)
+      call wtimer(wtime, .true.)
       call matrix_powerh(metric, -0.5d0)
-      call cpu_time(end_time)
-      dur_time = end_time - start_time
-      print '("Calculation of (P|Q)**-0.5 took", f8.4, " s.")', end_time - start_time
+      call wtimer(wtime)
+      print '("Calculation of (P|Q)**-0.5 took", f8.4, " s.")', wtime
 
       ! Initialize matrices
       gamma_P = 0
       df_tensor = 0
 
-      start_time = omp_get_wtime()
+      ! Start measuring integral calculation / density contraction
+      call wtimer(wtime, .true.)
 
       !$omp parallel
       ! Allocate array for tracking number of skipped shell-triplets
@@ -187,15 +186,14 @@ contains
       ! End of density contraction
       !$omp end do
       !$omp end parallel
-      end_time = omp_get_wtime()
+      call wtimer(wtime)
 
       deallocate (integrals)
 
       ntriplets_skipped = sum(skipped_by_thread)
       deallocate(skipped_by_thread)
 
-      dur_time = end_time - start_time
-      print '("Density contraction took", f8.4, " s.")', end_time - start_time
+      print '("Density contraction took", f8.4, " s.")', wtime
       print '("Screened out ", i12, " of ", i12, " integral triplets (", f8.2, "%)")', &
          ntriplets_skipped, ntriplets, 100 * real(ntriplets_skipped, dp) / real(ntriplets, dp)
 
