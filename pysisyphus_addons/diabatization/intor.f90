@@ -31,6 +31,8 @@ contains
       ! Auxiliary AO basis for density fitting
       type(t_shells), intent(in) :: shells_aux
       ! (Multiple) densities in the AO basis; shape is (ndens, nao, nao)
+      ! The densities are expected to be in lower triangular order:
+      ! (1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3), ...
       real(dp), intent(in) :: densities(:, :, :)
       ! 2d-array holding the contraction gamma_P with the inverse square root of the metric
       ! shape(naux, ndens)
@@ -213,6 +215,7 @@ contains
       ! Auxiliary AO basis for density fitting
       type(t_shells), intent(in) :: shells_aux
       ! (Multiple) densities in the AO basis; shape is (ndens, nao, nao)
+      ! See 'contract_coulomb_densities_2d' for more comments on the density.
       real(dp), intent(in) :: densities(:, :, :)
       ! 4d Coulomb-tensor; shape (nstates, nstates, nstates, nstates)
       ! coulomb_tensor corresponds to R_JKLM (eq. 34) in [2]
