@@ -1,5 +1,6 @@
 libhermes_srcs += files(
   'constants.f90',
+  'helpers.f90',
   'timing.f90',
   'erfinv.f90',
   'math.f90',

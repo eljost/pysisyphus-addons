@@ -17,3 +17,6 @@ license = {file = 'LICENSE'}
 authors = [
   {name = "Johannes Steinmetzer", email="johannes.steinmetzer@uni-jena.de"},
 ]
+
+[tool.meson-python.args]
+install = ['--skip-subprojects']

@@ -43,5 +43,6 @@ libhermes = library('libhermes', libhermes_srcs,
 )
 
 subdir('intor')
+subdir('std')
 subdir('diabatization')
 subdir('grid')

@@ -57,4 +57,27 @@ contains
     call dgemm("N", "T", n, n, n, 1d0, work, n, eigvecs, n, 0d0, mat, n)
   end subroutine matrix_powerh
 
+  subroutine inv_chol(mat)
+    ! Cholesky decomposition of symmetric positive-definite matrix mat into lower
+    ! triangular matrix L, followed by inversion of L. The input matrix mat is
+    ! overwritten in the process and will finally contain the inverse of L, L⁻¹.
+    !
+    ! This capability is useful for calculating density fitting metric. L⁻¹^T can be
+    ! absorbed into the DF-tensor (rs|P).
+
+    ! Symmetric, positive-definite matrix
+    real(dp), intent(in out) :: mat(:, :)
+    ! Number of rows/columns in mat
+    integer(i4) :: N
+    integer(i4) :: info
+
+    N = size(mat, 1)
+
+    ! Cholesky decomposition of mat into L L^T
+    call dpotrf("L", N, mat, N, info)
+
+    ! Invert lower triangular matrix
+    call dtrtri("L", "N", N, mat, N, info)
+  end subroutine inv_chol
+
 end module mod_pa_linalg
