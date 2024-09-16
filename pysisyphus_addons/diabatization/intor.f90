@@ -12,7 +12,7 @@ module mod_pa_diabatization
 
    use mod_pa_constants, only: i4, i8, dp
    use mod_pa_timing, only: wtimer
-   use mod_pa_linalg, only: matrix_powerh
+   use mod_pa_linalg, only: inv_chol
    use mod_pa_shells, only: t_shell, t_shells
    use mod_pa_init, only: init
    use mod_pa_screening, only: t_df_screener
@@ -34,9 +34,8 @@ contains
       ! The densities are expected to be in lower triangular order:
       ! (1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3), ...
       real(dp), intent(in) :: densities(:, :, :)
-      ! 2d-array holding the contraction gamma_P with the inverse square root of the metric
-      ! shape(naux, ndens)
-      ! work corresponds to B^JK_Y (eq. 33) in [2].
+      ! 2d-array with shape(naux, ndens) holding the contraction R^JK_X (eq. 32 in [2])
+      ! with the inverse square root of the metric; corresponds to B^JK_Y (eq. 33) in [2].
       real(dp), intent(in out):: df_tensor(:, :)
 
       ! Intermediate variables
@@ -54,10 +53,6 @@ contains
       ! 1d-array holding the 3-center-2-electron integrals
       real(dp), allocatable :: integrals(:)
       integer(i4) :: size_abc
-      ! 2d-array holding the contraction of the densities with the 3-center-2-electron integrals.
-      ! shape(naux, ndens)
-      ! gamma_P corresponds to R^JK_X (eq. 32) in [2].
-      real(dp), allocatable :: gamma_P(:, :)
       ! Variable used for timing function executions
       real(dp) :: wtime
       ! Screener
@@ -81,7 +76,6 @@ contains
          shells_aux%nshells, shells_aux%nsphbfs
       print '(" Densities:", i6)', ndens
 
-      allocate (gamma_P(naux, ndens))
       allocate (integrals((2 * shells%L_max + 1)**2 * (2*shells_aux%L_max + 1)))
 
       ! Initialize integral pointers, if not already done
@@ -101,12 +95,11 @@ contains
 
       ! ... raise it to the power -0.5 to calculate (P|Q)^-0.5
       call wtimer(wtime, .true.)
-      call matrix_powerh(metric, -0.5d0)
+      call inv_chol(metric)
       call wtimer(wtime)
       print '("Calculation of (P|Q)**-0.5 took", f8.4, " s.")', wtime
 
-      ! Initialize matrices
-      gamma_P = 0
+      ! Initialize DF-tensor
       df_tensor = 0
 
       ! Start measuring integral calculation / density contraction
@@ -121,7 +114,7 @@ contains
       end if
       !$omp end critical
 
-      ! Contract densities with 3-center-2-electron integrals to form gamma_P
+      ! Contract densities with 3-center-2-electron integrals in df_tensor
       !
       ! Loop over all shells in the auxiliary basis.
       ! The loop is parallelized over the auxiliary shells, so every thread accumulates
@@ -166,12 +159,12 @@ contains
                      do j = shell_b%sph_index, shell_b%sph_index_end
                         ! Loop over auxiliary basis functions
                         do k = shell_aux_c%sph_index, shell_aux_c%sph_index_end
-                           gamma_P(k, dens_ind) = gamma_P(k, dens_ind) + integrals(int_ind) &
+                           df_tensor(k, dens_ind) = df_tensor(k, dens_ind) + integrals(int_ind) &
                                                    *densities(dens_ind, i, j)
                            ! Take symmetry of the density matrix into account; off-diagonal
                            ! elements are counted twice.
                            if (a .ne. b) then
-                              gamma_P(k, dens_ind) = gamma_P(k, dens_ind) + integrals(int_ind) &
+                              df_tensor(k, dens_ind) = df_tensor(k, dens_ind) + integrals(int_ind) &
                                                       *densities(dens_ind, j, i)
                            end if
                            int_ind = int_ind + 1
@@ -199,11 +192,10 @@ contains
       print '("Screened out ", i12, " of ", i12, " integral triplets (", f8.2, "%)")', &
          ntriplets_skipped, ntriplets, 100 * real(ntriplets_skipped, dp) / real(ntriplets, dp)
 
-      ! Contract gamma_P with inverse square root (P|Q)^-1/2 of the metric (P|Q)
-      ! The result is stored in 'df_tensor'.
+
+      ! Contract df_tensor with inverse square root (P|Q)^-1/2 of the metric (P|Q).
       ! This contraction corresponds to eq. (33) in [2]
-      call dgemm("N", "N", naux, ndens, naux, 1d0, metric, naux, gamma_P, naux, &
-                 0d0, df_tensor, naux)
+      call dtrmm("L", "L", "N", "N", naux, ndens, 1d0, metric, naux, df_tensor, naux)
 
    end subroutine contract_coulomb_densities_2d
 

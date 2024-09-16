@@ -63,7 +63,8 @@ contains
     ! overwritten in the process and will finally contain the inverse of L, L⁻¹.
     !
     ! This capability is useful for calculating density fitting metric. L⁻¹^T can be
-    ! absorbed into the DF-tensor (rs|P).
+    ! absorbed into the DF-tensor (rs|P) and it is much faster than matrix_powerh()
+    ! above.
 
     ! Symmetric, positive-definite matrix
     real(dp), intent(in out) :: mat(:, :)

@@ -38,7 +38,7 @@ subdir('gdma')
 
 libhermes_srcs = []
 subdir('common')
-libhermes = library('libhermes', libhermes_srcs, 
+libhermes = library('hermes', libhermes_srcs,
   dependencies: [openmp_dep, blas_dep, lapack_dep],
 )
 
