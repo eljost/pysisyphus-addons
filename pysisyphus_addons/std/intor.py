@@ -44,3 +44,20 @@ def int_df1c(shells, shells_aux):
         bas_spec_aux,
         bas_data_aux,
     )
+
+
+def int_df2c_mo(shells, shells_aux, mo_tensor):
+    bas_centers, bas_spec, bas_data = shells.as_arrays(fortran=True)
+    bas_centers_aux, bas_spec_aux, bas_data_aux = shells_aux.as_arrays(fortran=True)
+
+    return _intor.int_df2c_mo(
+        # AO basis
+        bas_centers,
+        bas_spec,
+        bas_data,
+        # Auxiliary basis
+        bas_centers_aux,
+        bas_spec_aux,
+        bas_data_aux,
+        mo_tensor,
+    )
