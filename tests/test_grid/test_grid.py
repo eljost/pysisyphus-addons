@@ -13,7 +13,7 @@ def test_eval_density(num):
     """Compare Fortran implementation against numba implementation in pysisyphus."""
     wf_fn = "lib:orca_h2o_sto3g.json"
     wf = Wavefunction.from_file(wf_fn)
-    grid3d, spacing, _ = get_grid(wf, num=num, offset=4.0)
+    grid3d, spacing, _ = get_grid(wf, num=num, margin=4.0)
     volume_element = np.prod(spacing)
 
     density = wf.P_tot
@@ -45,7 +45,7 @@ def test_densities():
     wf_fn = "lib:iao_ref_uhf.json"
     wf = Wavefunction.from_file(wf_fn)
     num = 80
-    grid3d, spacing, _ = get_grid(wf, num=num, offset=4.0)
+    grid3d, spacing, _ = get_grid(wf, num=num, margin=4.0)
     volume_element = np.prod(spacing)
 
     Pa, Pb = wf.P
