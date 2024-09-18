@@ -1,36 +1,40 @@
-# 2-center-2-electron Coulomb integrals
-int_2c2e = custom_target('int_2c2e',
-  output: ['int_2c2e.f90', ],
-  command: ['sympleints-graph', 'int2c2e',
-            '--lmax', lmax.to_string(),
-            '--lauxmax', lauxmax.to_string(),
-            '--out-dir', pkgdir / 'common' / 'integrals'])
+integral_srcs = []
 
-# 3-center-2-electron Coulomb integrals
-int_3c2e = custom_target('int_3c2e',
-  output: ['int_3c2e.f90', ],
-  command: ['sympleints-graph', 'int3c2e',
-            '--lmax', lmax.to_string(),
-            '--lauxmax', lauxmax.to_string(),
-            '--out-dir', pkgdir / 'common' / 'integrals'])
+# Loop over all integrals required for density fitting and screening.
+foreach key : ['int2c2e', 'int3c2e', 'schwarz']
+  srcs = run_command(
+    'sympleints-graph',
+    '--lmax', lmax.to_string(),
+    '--lauxmax', lauxmax.to_string(),
+    '--sources',
+    key,
+  ).stdout().strip().split()
 
+  foreach fn : srcs
+    message(fn)
+  endforeach
 
-# 4-center-2-electron Coulomb integrals
-int_4c2e = custom_target('int_4c2e',
-  output: ['int_4c2e.f90', ],
-  command: ['sympleints-graph', 'schwarz',
-            '--lmax', lmax.to_string(),
-            '--out-dir', pkgdir / 'common' / 'integrals'])
+  integral_srcs += custom_target(key + 'with sympleints-graph',
+    output: srcs,
+    command: [
+      'sympleints-graph', key,
+      '--lmax', lmax.to_string(),
+      '--lauxmax', lauxmax.to_string(),
+      '--out-dir', pkgdir / 'common' / 'integrals'
+    ]
+  )
+endforeach
 
-# Boys-function
+# Boys function sources
 libhermes_srcs += files(
   'boys_data.f90',
   'boys.f90',
 )
 
-# Generate density-fitting integrals
-libhermes_srcs += [int_2c2e, int_3c2e, int_4c2e]
+# Integral sources
+libhermes_srcs += integral_srcs
 
+# Initializer and driver sources
 libhermes_srcs += files(
   'init.f90',
   'intor.f90',
