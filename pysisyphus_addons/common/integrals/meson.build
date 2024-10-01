@@ -8,6 +8,7 @@ foreach key : ['int2c2e', 'int3c2e', 'schwarz']
     '--lauxmax', lauxmax.to_string(),
     '--sources',
     key,
+    check: true,
   ).stdout().strip().split()
 
   foreach fn : srcs
