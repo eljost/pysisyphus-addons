@@ -1,6 +1,7 @@
 module mod_prim_dens
 
    use iso_c_binding, only: dp => c_double, int32 => c_int32_t
+   use omp_lib
 
    implicit none
 
@@ -14,6 +15,7 @@ module mod_prim_dens
 contains
 
    subroutine prefacts(La, RA, res)
+      ! Similar to cart_gto3d_rel in grid.f90
       integer(int32), intent(in) :: La
       real(dp), intent(in) :: RA(3)
       real(dp), intent(out) :: res(:)
@@ -45,12 +47,12 @@ contains
       ! s-Orbital
       if (La == 0) then
          res(1) = 1.0
-         ! p-Orbital
+      ! p-Orbital
       elseif (La == 1) then
          res(1) = dx
          res(2) = dy
          res(3) = dz
-         ! d-Orbital
+      ! d-Orbital
       elseif (La == 2) then
          res(1) = NORM2*dx2
          res(2) = dx*dy
@@ -58,7 +60,7 @@ contains
          res(4) = NORM2*dy2
          res(5) = dy*dz
          res(6) = NORM2*dz2
-         ! f-Orbital
+      ! f-Orbital
       elseif (La == 3) then
          res(1) = NORM3*dx3
          res(2) = NORM2*dx2*dy
@@ -70,7 +72,7 @@ contains
          res(8) = NORM2*dy2*dz
          res(9) = NORM2*dy*dz2
          res(10) = NORM3*dz3
-         ! g-Orbital
+      ! g-Orbital
       elseif (La == 4) then
          res(1) = NORM4*dx4
          res(2) = NORM3*dx3*dy
@@ -115,6 +117,8 @@ contains
       ! Double array; holds the numerically integrated density.
       real(dp), intent(out) :: rho(npoints)
 
+      real(dp), allocatable :: rho_by_thread(:, :)
+      integer(int32) :: thread_id
       ! Contraction coefficients da, db and orbital exponents ax, bx
       real(dp) :: da, ax, db, bx
       ! Total exponent px, reduced exponent mux
@@ -142,15 +146,27 @@ contains
       real(dp) :: factor
 
       ! Initialize density array
-      rho = 0d0
+      rho = 0
 
       ! Allocate prefactor arrays once using the maximum L values
       Lmax = maxval(Ls_inds(1, :))
-      allocate (prefacts_a(cart_size(Lmax)))
-      allocate (prefacts_b(cart_size(Lmax)))
+      allocate(prefacts_a(cart_size(Lmax)))
+      allocate(prefacts_b(cart_size(Lmax)))
+      !$omp parallel
+      ! Allocate one row per thread in rho_by_thread; but try to allocate only once.
+      !$omp critical
+      if (.not. allocated(rho_by_thread)) then
+         allocate(rho_by_thread(omp_get_num_threads(), npoints))
+         rho_by_thread = 0
+      end if
+      !$omp end critical
 
+      !$omp do private(thread_id, da, ax, A, La, cart_index_a, &
+      !$omp& cart_size_a, db, bx, B, Lb, cart_index_b, cart_size_b, px, mux, factor, K, Povlp, &
+      !$omp& R, RP, RP2, Pexp, prefacts_a, prefacts_b) schedule (dynamic)
       ! Loop over primitive pairs/first primitive
       do ai = 1, nprims
+         thread_id = omp_get_thread_num() + 1
          da = primdata(1, ai)
          ax = primdata(2, ai)
          A = primdata(3:5, ai)
@@ -189,8 +205,8 @@ contains
 
             ! Take symmetry into account, as we only loop over unique primitive
             ! combinations.
-            factor = 2.0_dp
-            if (ai == bi) factor = 1.0_dp
+            factor = 2
+            if (ai == bi) factor = 1
 
             ! Pre-exponential factor w/ contraction coeffcients and symmetry factor
             K = da*db*factor*exp(-mux*sum((A - B)**2))
@@ -218,7 +234,7 @@ contains
                ! entries.
                do nu = 1, cart_size_a
                   do mu = 1, cart_size_b
-                     rho(i) = rho(i) + &
+                     rho_by_thread(thread_id, i) = rho_by_thread(thread_id, i) + &
                               K*Pexp &
                               *P(cart_index_a + nu, cart_index_b + mu) &
                               *prefacts_a(nu) &
@@ -229,6 +245,14 @@ contains
             end do  ! End of loop over grid points R
          end do  ! End of loop over prims b
       end do  ! End of loop over prims a
+      !$omp end do
+
+      ! Accumulate rhos from the different threads into rho
+      !$omp critical
+      rho = rho + rho_by_thread(omp_get_thread_num()+1, :)
+      !$omp end critical
+      !$omp end parallel
+
 
       deallocate (prefacts_a)
       deallocate (prefacts_b)

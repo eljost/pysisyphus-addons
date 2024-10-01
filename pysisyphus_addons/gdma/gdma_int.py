@@ -6,7 +6,7 @@ from pysisyphus.numint import MolGrid
 from pysisyphus.wavefunction import Shells, Wavefunction
 from pysisyphus.wavefunction.gdma_int import get_prim_data
 
-from pysisyphus_addons.wavefunction.prim_dens import eval_prim_density
+from pysisyphus_addons.gdma.prim_dens import eval_prim_density
 
 
 def get_diffuse_density(
